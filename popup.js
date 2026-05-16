@@ -1,6 +1,6 @@
 async function showStoredCity() {
   try {
-    const data = await browser.storage.local.get(['city', 'district', 'street', 'adaNo', 'parselNo', 'tapuAlani', 'nitelik', 'tkgmStatus']);
+    const data = await browser.storage.local.get(['city', 'district', 'street', 'adaNo', 'parselNo', 'tapuAlani', 'nitelik', 'tkgmStatus', 'tkgmRequestCount', 'tkgmRequestDate']);
     document.getElementById('city').textContent = data.city || 'Not set';
     document.getElementById('district').textContent = data.district || 'Not set';
     const streetEl = document.getElementById('street');
@@ -15,6 +15,13 @@ async function showStoredCity() {
     if (nitelikEl) nitelikEl.textContent = data.nitelik || 'Not set';
     const statusEl = document.getElementById('tkgm-status');
     if (statusEl) statusEl.textContent = data.tkgmStatus || 'Not started';
+
+    const dailyCountEl = document.getElementById('daily-count');
+    if (dailyCountEl) {
+      const today = new Date().toDateString();
+      const count = data.tkgmRequestDate === today ? (data.tkgmRequestCount || 0) : 0;
+      dailyCountEl.textContent = `${count}/70`;
+    }
   } catch (e) {
     document.getElementById('city').textContent = 'Error';
     document.getElementById('district').textContent = 'Error';
@@ -30,6 +37,8 @@ async function showStoredCity() {
     if (nitelikEl) nitelikEl.textContent = 'Error';
     const statusEl = document.getElementById('tkgm-status');
     if (statusEl) statusEl.textContent = 'Error';
+    const dailyCountEl = document.getElementById('daily-count');
+    if (dailyCountEl) dailyCountEl.textContent = 'Error';
   }
 }
 
@@ -75,6 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (changes.nitelik) {
         const el = document.getElementById('nitelik');
         if (el) el.textContent = changes.nitelik.newValue || 'Not set';
+      }
+      if (changes.tkgmRequestCount || changes.tkgmRequestDate) {
+        showStoredCity(); // reload full state easily to check date + count logic
       }
     });
   }

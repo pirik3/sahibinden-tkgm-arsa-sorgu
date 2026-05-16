@@ -89,31 +89,12 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.type === 'autoTkgm' && msg.values) {
     const { city, district, street, adaNo, parselNo, url } = msg.values;
 
-    lookupTkgm(city, district, street, adaNo, parselNo)
-      .then(({ tapuAlani, nitelik }) => {
-        const payload = {
-          tkgmStatus: 'Done',
-          tapuAlani: tapuAlani || '',
-          nitelik: nitelik || '',
-          tkgmCachedUrl: url || '',
-        };
-        // Persist to storage
-        chrome.storage.local.set(payload);
-        // Broadcast to all sahibinden tabs
-        chrome.tabs.query({}, tabs => {
-          for (const t of tabs) {
-            try {
-              if (t && t.url && t.id && t.url.includes('sahibinden.com')) {
-                chrome.tabs.sendMessage(t.id, { type: 'tkgmUpdated', payload });
-              }
-            } catch (e) {}
-          }
-        });
-        sendResponse({ success: true, tapuAlani, nitelik });
-      })
-      .catch(err => {
-        console.warn('[TKGM API]', err.message);
-        const payload = { tkgmStatus: 'Error: ' + err.message };
+    chrome.storage.local.get(['tkgmRequestCount', 'tkgmRequestDate'], data => {
+      const today = new Date().toDateString();
+      let count = data.tkgmRequestDate === today ? (data.tkgmRequestCount || 0) : 0;
+
+      if (count >= 70) {
+        const payload = { tkgmStatus: 'Daily limit reached (70/70)' };
         chrome.storage.local.set(payload);
         chrome.tabs.query({}, tabs => {
           for (const t of tabs) {
@@ -124,8 +105,52 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             } catch (e) {}
           }
         });
-        sendResponse({ success: false, error: err.message });
-      });
+        sendResponse({ success: false, error: 'Daily limit reached' });
+        return;
+      }
+
+      // Increment limit optimistically
+      count++;
+      chrome.storage.local.set({ tkgmRequestCount: count, tkgmRequestDate: today });
+
+      lookupTkgm(city, district, street, adaNo, parselNo)
+        .then(({ tapuAlani, nitelik }) => {
+          const payload = {
+            tkgmStatus: `Done (${count}/70)`,
+            tapuAlani: tapuAlani || '',
+            nitelik: nitelik || '',
+            tkgmCachedUrl: url || '',
+          };
+          // Persist to storage
+          chrome.storage.local.set(payload);
+          // Broadcast to all sahibinden tabs
+          chrome.tabs.query({}, tabs => {
+            for (const t of tabs) {
+              try {
+                if (t && t.url && t.id && t.url.includes('sahibinden.com')) {
+                  chrome.tabs.sendMessage(t.id, { type: 'tkgmUpdated', payload });
+                }
+              } catch (e) {}
+            }
+          });
+          sendResponse({ success: true, tapuAlani, nitelik });
+        })
+        .catch(err => {
+          console.warn('[TKGM API]', err.message);
+          const payload = { tkgmStatus: `Error: ${err.message} (${count}/70)` };
+          chrome.storage.local.set(payload);
+          chrome.tabs.query({}, tabs => {
+            for (const t of tabs) {
+              try {
+                if (t && t.url && t.id && t.url.includes('sahibinden.com')) {
+                  chrome.tabs.sendMessage(t.id, { type: 'tkgmUpdated', payload });
+                }
+              } catch (e) {}
+            }
+          });
+          sendResponse({ success: false, error: err.message });
+        });
+    });
 
     return true; // keep channel open for async sendResponse
   }

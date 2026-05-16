@@ -477,7 +477,13 @@
     for (let i = 0; i < fields.length; i++) {
       const [k, v] = fields[i];
       const bgColor = i % 2 === 0 ? 'rgb(239, 239, 239)' : 'rgb(245, 245, 245)';
-      bodyRows += `<tr style="background-color: ${bgColor};"><td style="padding: 3px; text-align: left; padding-left:6px; width: 35%;">${k}</td><td style="padding: 3px; text-align: left; padding-left:6px;">${v}</td></tr>`;
+      let displayValue = v;
+      if (k === 'Status' && typeof v === 'string' && (v.toLowerCase().includes('error') || v.toLowerCase().includes('limit'))) {
+        displayValue = `<span style="color:red; font-weight:bold;">${v}</span>`;
+      } else if (k === 'Status' && typeof v === 'string' && v.toLowerCase().includes('done')) {
+        displayValue = `<span style="color:green; font-weight:bold;">${v}</span>`;
+      }
+      bodyRows += `<tr style="background-color: ${bgColor};"><td style="padding: 3px; text-align: left; padding-left:6px; width: 35%;">${k}</td><td style="padding: 3px; text-align: left; padding-left:6px;">${displayValue}</td></tr>`;
     }
 
     container.innerHTML = `<table style="width: 100%;"><thead class="waiu" style="background: -webkit-linear-gradient(rgb(221, 221, 221) 0px, rgb(238, 238, 238) 100%);"><tr><th class="iyguml">Yer</th><th class="iyguml">Bilgi</th></tr></thead><tbody>${bodyRows}</tbody></table>`;
@@ -590,6 +596,9 @@
       if (!Object.keys(changes).some(key => tracked.includes(key))) return;
       loadStoredData(values => {
         if (values && Object.keys(values).length) {
+          // Prevent cross-tab contamination
+          if (values.tkgmCachedUrl && values.tkgmCachedUrl !== location.href) return;
+          
           values.url = location.href;
           values.scrapedAt = new Date().toLocaleString();
           if (changes.tkgmStatus) values.status = changes.tkgmStatus.newValue;
@@ -771,17 +780,26 @@
     try {
       loadStoredData(stored => {
         const merged = { ...toSave };
-        if (stored.tapuAlani) merged.tapuAlani = stored.tapuAlani;
-        if (stored.nitelik) merged.nitelik = stored.nitelik;
-        if (stored.tkgmStatus) merged.status = stored.tkgmStatus;
+        const cacheHit = stored.tkgmCachedUrl && stored.tkgmCachedUrl === toSave.url;
+        
+        if (cacheHit) {
+          if (stored.tapuAlani) merged.tapuAlani = stored.tapuAlani;
+          if (stored.nitelik) merged.nitelik = stored.nitelik;
+          if (stored.tkgmStatus) merged.status = stored.tkgmStatus;
+        } else {
+          // New URL -> clear old data so it doesn't mislead the user
+          merged.tapuAlani = '';
+          merged.nitelik = '';
+          merged.status = 'New listing detected, checking...';
+        }
+        
         renderInfoBox(merged);
 
         // --- Auto-trigger TKGM background API lookup ---
-        // Skip if: already running, or cached URL matches this listing with both values
+        // Skip if: already running, or we have both values for this URL
         const alreadyRunning = !!window.__tkgmAutoRunning;
-        const cacheHit = stored.tkgmCachedUrl && stored.tkgmCachedUrl === toSave.url &&
-                         stored.tapuAlani && stored.nitelik;
-        if (!alreadyRunning && !cacheHit) {
+        const fullCacheHit = cacheHit && stored.tapuAlani && stored.nitelik;
+        if (!alreadyRunning && !fullCacheHit) {
           window.__tkgmAutoRunning = true;
           renderInfoBox({ ...merged, status: 'TKGM lookup running...' });
           const trigger = () => {
@@ -857,6 +875,7 @@
         // Another tab reports TKGM update; refresh stored data and UI
         loadStoredData(values => {
           if (values && Object.keys(values).length) {
+            if (values.tkgmCachedUrl && values.tkgmCachedUrl !== location.href) return;
             values.url = location.href;
             values.scrapedAt = new Date().toLocaleString();
             renderInfoBox(values);
@@ -873,6 +892,7 @@
       if (msg && msg.type === 'tkgmUpdated') {
         loadStoredData(values => {
           if (values && Object.keys(values).length) {
+            if (values.tkgmCachedUrl && values.tkgmCachedUrl !== location.href) return;
             values.url = location.href;
             values.scrapedAt = new Date().toLocaleString();
             renderInfoBox(values);
@@ -901,30 +921,39 @@
     return;
   }
 
+  // Initial load
   loadStoredData(values => {
     if (values && Object.keys(values).length) {
+      if (values.tkgmCachedUrl && values.tkgmCachedUrl !== location.href) return;
       values.url = location.href;
       values.scrapedAt = new Date().toLocaleString();
       renderInfoBox(values);
     }
   });
 
-  if (!savePageData()) {
-    let attempts = 0;
-    const maxAttempts = 12;
-    const interval = setInterval(() => {
-      attempts += 1;
-      if (savePageData() || attempts >= maxAttempts) {
-        clearInterval(interval);
+  // Track URL to handle SPA navigation and retry scraping if DOM is slow
+  let lastUrl = location.href;
+  let scrapeAttempts = 0;
+  
+  const attemptScrape = () => {
+    if (savePageData()) {
+      scrapeAttempts = 0; // Success
+    } else {
+      scrapeAttempts++;
+      if (scrapeAttempts < 15) {
+        setTimeout(attemptScrape, 500); // Retry a few times if DOM elements are missing
       }
-    }, 500);
+    }
+  };
 
-    const mo = new MutationObserver((mutations, obs) => {
-      if (savePageData()) {
-        obs.disconnect();
-        clearInterval(interval);
-      }
-    });
-    mo.observe(document.documentElement || document.body, { childList: true, subtree: true });
-  }
+  attemptScrape();
+
+  // Watch for SPA URL changes
+  setInterval(() => {
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      scrapeAttempts = 0;
+      attemptScrape();
+    }
+  }, 1000);
 })();
