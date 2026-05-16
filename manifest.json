@@ -11,7 +11,12 @@
     "scripts": ["background.js"],
     "persistent": false
   },
-  "permissions": ["storage", "tabs"],
+  "permissions": [
+    "storage",
+    "tabs",
+    "https://cbsapi.tkgm.gov.tr/*",
+    "https://parselsorgu.tkgm.gov.tr/*"
+  ],
   "content_scripts": [
     {
       "matches": ["*://*.sahibinden.com/*", "*://sahibinden.com/*", "*://parselsorgu.tkgm.gov.tr/*"],

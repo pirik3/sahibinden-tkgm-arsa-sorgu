@@ -191,13 +191,74 @@
       return true;
     }
 
-    async function waitForDropdownOption(selector, text, interval = 500, maxAttempts = 20) {
+    async function waitForDropdownOption(selector, text, interval = 150, maxAttempts = 60) {
       const search = normalizeText(text);
       return retry(() => {
         const el = document.querySelector(selector);
         if (!el) return false;
         return Array.from(el.options || []).some(o => getMatchScore(o.textContent, search) >= 0.25);
       }, interval, maxAttempts);
+    }
+
+    // Waits for the query button to become clickable (not disabled, visible).
+    // Falls back after maxMs if it never becomes enabled.
+    function waitForQueryButtonReady(btnSelector = '#administrative-query-btn', maxMs = 3000) {
+      return new Promise(resolve => {
+        const start = Date.now();
+        // Check immediately
+        const el = document.querySelector(btnSelector);
+        if (el && !el.disabled) { resolve(true); return; }
+
+        let mo;
+        const done = (result) => {
+          if (mo) { try { mo.disconnect(); } catch (e) {} }
+          clearInterval(poll);
+          resolve(result);
+        };
+
+        // MutationObserver reacts instantly when the button's disabled attr changes
+        try {
+          mo = new MutationObserver(() => {
+            const btn = document.querySelector(btnSelector);
+            if (btn && !btn.disabled) done(true);
+          });
+          const container = document.querySelector('#administrative-query-container') || document.body;
+          mo.observe(container, { subtree: true, attributes: true, attributeFilter: ['disabled', 'class'] });
+        } catch (e) {}
+
+        // Fallback poll at 100ms intervals
+        const poll = setInterval(() => {
+          const btn = document.querySelector(btnSelector);
+          if ((btn && !btn.disabled) || Date.now() - start >= maxMs) {
+            done(!!(btn && !btn.disabled));
+          }
+        }, 100);
+      });
+    }
+
+    // Waits for a leaflet map polygon to exist in the DOM.
+    function waitForLeafletReady(maxMs = 3000) {
+      return new Promise(resolve => {
+        const start = Date.now();
+        const check = () => !!(document.querySelector('path.leaflet-interactive') || document.querySelector('.leaflet-interactive'));
+        if (check()) { resolve(true); return; }
+
+        let mo;
+        const done = (result) => {
+          if (mo) { try { mo.disconnect(); } catch (e) {} }
+          clearInterval(poll);
+          resolve(result);
+        };
+
+        try {
+          mo = new MutationObserver(() => { if (check()) done(true); });
+          mo.observe(document.body || document.documentElement, { childList: true, subtree: true });
+        } catch (e) {}
+
+        const poll = setInterval(() => {
+          if (check() || Date.now() - start >= maxMs) done(check());
+        }, 100);
+      });
     }
   function fetchModalValues() {
     const modal = document.querySelector('#modal-region') || document.querySelector('.modal') || document.body;
@@ -335,12 +396,13 @@
   async function analyzeHashPage() {
     try {
       if (!location.hash || !location.hash.includes('#ara/idari')) return;
-      await sleep(800);
+      // Wait for leaflet map to be ready instead of a blind sleep
+      await waitForLeafletReady(3000);
       loadStoredData(async (values) => {
         // try clicking any map polygon that may open a popup
-        await sleep(400);
-        await retry(() => simulateClickSelector('path.leaflet-interactive:nth-child(2)') || simulateClickSelector('.leaflet-interactive') || clickSelector('.leaflet-interactive') || clickSelector('path.leaflet-interactive'), 600, 8);
-        await sleep(400);
+        await retry(() => simulateClickSelector('path.leaflet-interactive:nth-child(2)') || simulateClickSelector('.leaflet-interactive') || clickSelector('.leaflet-interactive') || clickSelector('path.leaflet-interactive'), 200, 20);
+        // Small yield to let the click event propagate
+        await sleep(100);
 
         // try to activate modal region if present
         try {
@@ -351,12 +413,12 @@
           }
         } catch (e) { /* ignore */ }
 
-        const modalOpen = await waitForModalOpen(200, 12);
+        const modalOpen = await waitForModalOpen(100, 30);
         if (!modalOpen) {
-          await sleep(500);
+          await sleep(200);
         }
 
-        const modalData = await waitForModalData();
+        const modalData = await waitForModalData(300, 40);
         const finalStatus = modalData.tapu || modalData.nitelik ? 'Modal loaded (hash)' : 'Modal not found (hash)';
         const updated = { ...(values || {}), tapuAlani: modalData.tapu, nitelik: modalData.nitelik, status: finalStatus };
         renderInfoBox(updated);
@@ -369,7 +431,9 @@
 
   function retry(action, interval = 500, maxAttempts = 20) {
     return new Promise(resolve => {
-      let attempts = 0;
+      // Check immediately before the first interval
+      if (action()) { resolve(true); return; }
+      let attempts = 1;
       const timer = setInterval(() => {
         attempts += 1;
         if (action() || attempts >= maxAttempts) {
@@ -555,17 +619,19 @@
     } catch (e) {}
     const status = { status: 'Waiting for form...' };
     renderInfoBox({ ...values, ...status });
-    await sleep(100);
+    // Brief yield so the browser can process any pending framework updates
+    await sleep(50);
     try {
 
-    const cityReady = await retry(() => setSelectBySimilarText('#administrative-query-container > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > select:nth-child(2)', values.city), 500, 20);
+    const cityReady = await retry(() => setSelectBySimilarText('#administrative-query-container > div:nth-child(1) > div:nth-child(1) > div:nth-child(1) > select:nth-child(2)', values.city), 150, 40);
     if (!cityReady) {
       const updated = { ...values, status: 'City not found' };
       renderInfoBox(updated);
       saveTkgmStatus(updated);
       return;
     }
-    await sleep(100);
+    // Small yield for framework to react to city selection before district loads
+    await sleep(50);
 
     const districtSelector = '#administrative-query-container > div:nth-child(1) > div:nth-child(2) > div:nth-child(1) > select:nth-child(2)';
     const districtReady = await waitForDropdownOption(districtSelector, values.district);
@@ -576,14 +642,15 @@
       return;
     }
 
-    const districtSelected = await retry(() => setSelectBySimilarText(districtSelector, values.district), 500, 20);
+    const districtSelected = await retry(() => setSelectBySimilarText(districtSelector, values.district), 150, 40);
     if (!districtSelected) {
       const updated = { ...values, status: 'District not found' };
       renderInfoBox(updated);
       saveTkgmStatus(updated);
       return;
     }
-    await sleep(100);
+    // Small yield for framework to react to district selection before street loads
+    await sleep(50);
 
     const streetSelector = '#administrative-query-container > div:nth-child(1) > div:nth-child(3) > div:nth-child(1) > select:nth-child(2)';
     const streetReady = await waitForDropdownOption(streetSelector, values.street);
@@ -594,14 +661,15 @@
       return;
     }
 
-    const streetSelected = await retry(() => setSelectBySimilarText(streetSelector, values.street), 500, 20);
+    const streetSelected = await retry(() => setSelectBySimilarText(streetSelector, values.street), 150, 40);
     if (!streetSelected) {
       const updated = { ...values, status: 'Street not found' };
       renderInfoBox(updated);
       saveTkgmStatus(updated);
       return;
     }
-    await sleep(100);
+    // Small yield before filling numeric inputs
+    await sleep(50);
 
     const blockReady = setInputValue('#block-input', sanitizeDigits(values.adaNo));
     const parcelReady = setInputValue('#parcel-input', sanitizeDigits(values.parselNo));
@@ -611,22 +679,27 @@
       saveTkgmStatus(updated);
       return;
     }
-    await sleep(3000);
+
+    // Wait for the query button to become ready (replaces blind 3000ms sleep).
+    // TKGM typically enables it within a few hundred ms after the inputs are set.
+    await waitForQueryButtonReady('#administrative-query-btn', 3000);
 
     const queryReady = { ...values, status: 'Ready to query' };
     renderInfoBox(queryReady);
     saveTkgmStatus(queryReady);
     clickSelector('#administrative-query-btn');
-    await sleep(100);
+    // Small yield then wait for leaflet polygons to render before clicking
+    await sleep(50);
 
-    const clicked = await retry(() => simulateClickSelector('path.leaflet-interactive:nth-child(2)') || simulateClickSelector('.leaflet-interactive') || clickSelector('.leaflet-interactive') || clickSelector('path.leaflet-interactive'), 600, 10);
+    // Wait for the map to render a polygon, then click it
+    await waitForLeafletReady(5000);
+    const clicked = await retry(() => simulateClickSelector('path.leaflet-interactive:nth-child(2)') || simulateClickSelector('.leaflet-interactive') || clickSelector('.leaflet-interactive') || clickSelector('path.leaflet-interactive'), 200, 30);
     if (!clicked) {
       const updated = { ...values, status: 'No map polygon found' };
       renderInfoBox(updated);
       saveTkgmStatus(updated);
       return;
     }
-    await sleep(500);
 
     // Try to activate the modal region (some pages open popup on a separate element)
     try {
@@ -637,20 +710,19 @@
       }
     } catch (e) { /* ignore */ }
 
-    await sleep(1000);
-
-    // Wait for modal to be visible (body.modal-open and #modal-region.in)
-    const modalOpen = await waitForModalOpen(200, 10);
+    // Wait for modal to be visible (body.modal-open and #modal-region.in) — no blind sleep
+    const modalOpen = await waitForModalOpen(100, 30);
     if (!modalOpen) {
       // try clicking modal-region again briefly
       try {
         const modalRegion2 = document.querySelector('#modal-region');
         if (modalRegion2) modalRegion2.dispatchEvent(new MouseEvent('click', { bubbles: true }));
       } catch (e) { }
-      await sleep(500);
+      // One last short wait if modal still hasn't opened
+      await waitForModalOpen(100, 15);
     }
 
-    const modalData = await waitForModalContent(3000);
+    const modalData = await waitForModalContent(5000);
     const finalStatus = modalData.tapu || modalData.nitelik ? 'Modal loaded' : 'Modal not found';
     const updated = { ...values, tapuAlani: modalData.tapu, nitelik: modalData.nitelik, status: finalStatus };
     renderInfoBox(updated);
@@ -704,25 +776,27 @@
         if (stored.tkgmStatus) merged.status = stored.tkgmStatus;
         renderInfoBox(merged);
 
-        // --- Auto-trigger TKGM in background ---
-        // Skip if: TKGM is already running, or cached URL matches this listing
+        // --- Auto-trigger TKGM background API lookup ---
+        // Skip if: already running, or cached URL matches this listing with both values
         const alreadyRunning = !!window.__tkgmAutoRunning;
         const cacheHit = stored.tkgmCachedUrl && stored.tkgmCachedUrl === toSave.url &&
                          stored.tapuAlani && stored.nitelik;
         if (!alreadyRunning && !cacheHit) {
-          const trigger = callback => {
+          window.__tkgmAutoRunning = true;
+          renderInfoBox({ ...merged, status: 'TKGM lookup running...' });
+          const trigger = () => {
             try {
               if (typeof browser !== 'undefined') {
-                browser.runtime.sendMessage({ type: 'openTkgm', values: toSave, background: true })
-                  .then(() => callback()).catch(() => callback());
+                browser.runtime.sendMessage({ type: 'autoTkgm', values: toSave })
+                  .catch(() => { window.__tkgmAutoRunning = false; });
               } else if (typeof chrome !== 'undefined') {
-                chrome.runtime.sendMessage({ type: 'openTkgm', values: toSave, background: true }, () => callback());
+                chrome.runtime.sendMessage({ type: 'autoTkgm', values: toSave }, () => {
+                  window.__tkgmAutoRunning = false;
+                });
               }
-            } catch (e) { callback(); }
+            } catch (e) { window.__tkgmAutoRunning = false; }
           };
-          trigger(() => {
-            renderInfoBox({ ...merged, status: 'TKGM lookup running...' });
-          });
+          trigger();
         }
       });
     } catch (e) { /* ignore */ }
