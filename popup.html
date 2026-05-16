@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Simple Add-on Popup</title>
+    <style>
+      body { font-family: system-ui, sans-serif; width: 300px; padding: 12px; }
+      button { padding: 8px 12px; }
+      pre { background:#f3f3f3; padding:8px; overflow:auto }
+    </style>
+  </head>
+  <body>
+    <div>
+      <button id="get-url">Get current tab URL</button>
+      <pre id="url">Click the button to show the active tab URL.</pre>
+      <div style="margin-top:8px">City: <span id="city">Not set</span></div>
+      <div style="margin-top:4px">District: <span id="district">Not set</span></div>
+      <div style="margin-top:4px">Street: <span id="street">Not set</span></div>
+      <div style="margin-top:4px">AdaNo: <span id="adaNo">Not set</span></div>
+      <div style="margin-top:4px">ParselNo: <span id="parselNo">Not set</span></div>
+      <div style="margin-top:10px"><button id="open-tkgm">Open TKGM and fill</button></div>
+      <div style="margin-top:6px">TapuAlanı: <span id="tapuAlani">Not set</span></div>
+      <div style="margin-top:4px">Nitelik: <span id="nitelik">Not set</span></div>
+      <div style="margin-top:6px">TKGM status: <span id="tkgm-status">Not started</span></div>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,22 @@
+{
+  "manifest_version": 2,
+  "name": "Simple Firefox Add-on",
+  "version": "1.0.0",
+  "description": "A minimal Firefox WebExtension scaffold.",
+  "browser_action": {
+    "default_popup": "popup.html",
+    "default_title": "Simple Add-on"
+  },
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": false
+  },
+  "permissions": ["storage", "tabs"],
+  "content_scripts": [
+    {
+      "matches": ["*://*.sahibinden.com/*", "*://sahibinden.com/*", "*://parselsorgu.tkgm.gov.tr/*"],
+      "js": ["content_script.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
