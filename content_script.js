@@ -1,4 +1,4 @@
-﻿// Sahibinden.com sayfasından veri çeken asıl script_lklklk11
+﻿// Sahibinden.com sayfasından veri çeken asıl script_lklklk11223344
 (() => {
   const host = (location.hostname || '').toLowerCase();
   const allowed = /(^|\.)sahibinden\.com$/.test(host) || host === 'parselsorgu.tkgm.gov.tr';
