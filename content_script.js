@@ -1,14 +1,17 @@
+﻿// Sahibinden.com sayfasından veri çeken asıl script
 (() => {
   const host = (location.hostname || '').toLowerCase();
   const allowed = /(^|\.)sahibinden\.com$/.test(host) || host === 'parselsorgu.tkgm.gov.tr';
   if (!allowed) return;
 
+  // Sahibinden üzerindeki HTML elementlerinin selector'ları (verileri buralardan çekiyoruz)
   const citySelector = '.classifiedInfo > h2:nth-child(4) > a:nth-child(1)';
   const districtSelector = '.classifiedInfo > h2:nth-child(4) > a:nth-child(3)';
   const streetSelector = '.classifiedInfo > h2:nth-child(4) > a:nth-child(5)';
   const adaSelector = '.classifiedInfoList > li:nth-child(7) > span:nth-child(2)';
   const parselSelector = '.classifiedInfoList > li:nth-child(8) > span:nth-child(2)';
 
+  // Girdiğimiz HTML elementinden metni temiz bir şekilde almaya yarayan basit fonksiyon
   function getText(selector) {
     try {
       const el = document.querySelector(selector);
@@ -468,25 +471,90 @@
       ['ParselNo', data.parselNo || '-'],
       ['TapuAlanı', data.tapuAlani || '-'],
       ['Nitelik', data.nitelik || '-'],
-      ['URL', data.url || '-'],
+      ['İlanNo', data.ilanNo || '-'],
       ['Scraped', data.scrapedAt || '-'],
-      ['Status', data.status || '-']
+      ['Status', data.tkgmStatus || data.status || '-']
     ];
 
-    let bodyRows = '';
+    container.textContent = ''; // Güvenlik ve performans için eski içeriği temizle (innerHTML yerine textContent)
+
+    const table = document.createElement('table');
+    table.style.width = '100%';
+
+    const thead = document.createElement('thead');
+    thead.className = 'waiu';
+    thead.style.background = '-webkit-linear-gradient(rgb(221, 221, 221) 0px, rgb(238, 238, 238) 100%)';
+    const trHead = document.createElement('tr');
+    
+    const th1 = document.createElement('th');
+    th1.className = 'iyguml';
+    th1.textContent = 'Yer';
+    
+    const th2 = document.createElement('th');
+    th2.className = 'iyguml';
+    th2.textContent = 'Bilgi';
+    
+    trHead.appendChild(th1);
+    trHead.appendChild(th2);
+    thead.appendChild(trHead);
+    table.appendChild(thead);
+
+    const tbody = document.createElement('tbody');
     for (let i = 0; i < fields.length; i++) {
       const [k, v] = fields[i];
       const bgColor = i % 2 === 0 ? 'rgb(239, 239, 239)' : 'rgb(245, 245, 245)';
-      let displayValue = v;
-      if (k === 'Status' && typeof v === 'string' && (v.toLowerCase().includes('error') || v.toLowerCase().includes('limit'))) {
-        displayValue = `<span style="color:red; font-weight:bold;">${v}</span>`;
-      } else if (k === 'Status' && typeof v === 'string' && v.toLowerCase().includes('done')) {
-        displayValue = `<span style="color:green; font-weight:bold;">${v}</span>`;
+      
+      const tr = document.createElement('tr');
+      tr.style.backgroundColor = bgColor;
+      
+      const td1 = document.createElement('td');
+      td1.style.cssText = 'padding: 3px; text-align: left; padding-left:6px; width: 35%;';
+      td1.textContent = k;
+      
+      const td2 = document.createElement('td');
+      td2.style.cssText = 'padding: 3px; text-align: left; padding-left:6px;';
+      
+      if (k === 'Status' && typeof v === 'string' && (v.toLowerCase().includes('error') || v.toLowerCase().includes('hata') || v.toLowerCase().includes('limit'))) {
+        const span = document.createElement('span');
+        span.style.color = 'red';
+        span.style.fontWeight = 'bold';
+        span.textContent = v;
+        td2.appendChild(span);
+      } else if (k === 'Status' && typeof v === 'string' && (v.toLowerCase().includes('done') || v.toLowerCase().includes('tamamlandı'))) {
+        const span = document.createElement('span');
+        span.style.color = 'green';
+        span.style.fontWeight = 'bold';
+        span.textContent = v;
+        td2.appendChild(span);
+      } else {
+        td2.textContent = v;
       }
-      bodyRows += `<tr style="background-color: ${bgColor};"><td style="padding: 3px; text-align: left; padding-left:6px; width: 35%;">${k}</td><td style="padding: 3px; text-align: left; padding-left:6px;">${displayValue}</td></tr>`;
+      
+      tr.appendChild(td1);
+      tr.appendChild(td2);
+      tbody.appendChild(tr);
     }
+    table.appendChild(tbody);
+    container.appendChild(table);
 
-    container.innerHTML = `<table style="width: 100%;"><thead class="waiu" style="background: -webkit-linear-gradient(rgb(221, 221, 221) 0px, rgb(238, 238, 238) 100%);"><tr><th class="iyguml">Yer</th><th class="iyguml">Bilgi</th></tr></thead><tbody>${bodyRows}</tbody></table>`;
+    const footerDiv = document.createElement('div');
+    footerDiv.style.cssText = 'text-align: right; font-size: 10px; margin-top: 5px; padding-right: 5px;';
+    
+    const manualLink = document.createElement('a');
+    manualLink.href = '#';
+    manualLink.id = 'tkgm-manual-link';
+    manualLink.style.cssText = 'color: #d9534f; text-decoration: underline; margin-right: 10px;';
+    manualLink.textContent = "TKGM'de Manuel Aç";
+    
+    const devLink = document.createElement('a');
+    devLink.href = 'https://github.com/pirik3/sahibinden-tkgm-arsa-sorgu';
+    devLink.target = '_blank';
+    devLink.style.cssText = 'color: #0066cc; text-decoration: none;';
+    devLink.textContent = 'Developed by pirik3';
+    
+    footerDiv.appendChild(manualLink);
+    footerDiv.appendChild(devLink);
+    container.appendChild(footerDiv);
 
     const targetContainer = document.querySelector('.classifiedOtherBoxes');
     if (!document.getElementById(id)) {
@@ -502,56 +570,37 @@
     }
     // Ensure placement in case `.classifiedOtherBoxes` appears later
     ensureInfoBoxPlacement();
-    // Add TKGM open button for sahibinden pages
-    try {
-      const existingBtn = container.querySelector('#open-tkgm-from-box');
-      if (!existingBtn) {
-        const actions = document.createElement('div');
-        actions.className = 'mhsmlno-actions';
-        actions.style.marginTop = '8px';
-        actions.style.textAlign = 'left';
 
-        const btn = document.createElement('button');
-        btn.id = 'open-tkgm-from-box';
-        btn.textContent = 'Open TKGM';
-        btn.style.padding = '6px 10px';
-        btn.style.border = '1px solid #888';
-        btn.style.background = '#f5f5f5';
-        btn.style.cursor = 'pointer';
-        btn.addEventListener('click', () => {
-          try { saveTkgmStatus({ status: 'Opening TKGM...' }); } catch (e) {}
+    // Manuel TKGM linkine tıklama olayını ekleyelim
+    try {
+      const link = container.querySelector('#tkgm-manual-link');
+      if (link) {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
           const getData = callback => {
             try {
+              const keys = ['city', 'district', 'street', 'adaNo', 'parselNo', 'ilanNo'];
               if (typeof browser !== 'undefined') {
-                browser.storage.local.get(['city','district','street','adaNo','parselNo']).then(data => callback(data)).catch(() => callback({}));
+                browser.storage.local.get(keys).then(data => callback(data)).catch(() => callback({}));
               } else if (typeof chrome !== 'undefined') {
-                chrome.storage.local.get(['city','district','street','adaNo','parselNo'], data => callback(data || {}));
+                chrome.storage.local.get(keys, data => callback(data || {}));
               } else callback({});
-            } catch (e) { callback({}); }
+            } catch (err) { callback({}); }
           };
 
-          getData(async (data) => {
-            if (!data || !data.city || !data.district || !data.street || !data.adaNo || !data.parselNo) {
-              saveTkgmStatus({ status: 'Missing listing data' });
+          getData(async (storedData) => {
+            if (!storedData || !storedData.city || !storedData.district || !storedData.street || !storedData.adaNo || !storedData.parselNo) {
               return;
             }
             try {
               if (typeof browser !== 'undefined') {
-                await browser.runtime.sendMessage({ type: 'openTkgm', values: data });
-                saveTkgmStatus({ status: 'TKGM opened' });
+                await browser.runtime.sendMessage({ type: 'openTkgm', values: storedData });
               } else if (typeof chrome !== 'undefined') {
-                chrome.runtime.sendMessage({ type: 'openTkgm', values: data }, resp => {
-                  saveTkgmStatus({ status: resp && resp.success ? 'TKGM opened' : 'Failed to open TKGM' });
-                });
+                chrome.runtime.sendMessage({ type: 'openTkgm', values: storedData });
               }
-            } catch (e) {
-              saveTkgmStatus({ status: 'Error opening TKGM' });
-            }
+            } catch (err) {}
           });
         });
-
-        actions.appendChild(btn);
-        container.appendChild(actions);
       }
     } catch (e) { /* ignore */ }
   }
@@ -750,58 +799,75 @@
     }
   }
 
+  // Sahibinden sayfasındaki verileri okuyup kaydeden asıl fonksiyon
   function savePageData() {
     const city = getText(citySelector);
     const district = getText(districtSelector);
     const street = getText(streetSelector);
     const adaNo = getText(adaSelector);
     const parselNo = getText(parselSelector);
+    const ilanNo = getText('#classifiedId'); // İlan numarasını direkt HTML'den çekiyoruz
     const toSave = {};
+    
+    // Bulunan verileri objeye atalım
     if (city) toSave.city = city;
     if (district) toSave.district = district;
     if (street) toSave.street = street;
     if (adaNo) toSave.adaNo = adaNo;
     if (parselNo) toSave.parselNo = parselNo;
+    if (ilanNo) toSave.ilanNo = ilanNo;
 
+    // Eğer sayfada hiçbiri yoksa henüz yüklenmemiş demektir, çıkalım
     if (Object.keys(toSave).length === 0) return false;
 
-    toSave.url = location.href;
     toSave.scrapedAt = new Date().toLocaleString();
 
+    // Bulduğumuz temel bilgileri storage'a atıyoruz ki her yerden erişebilelim
     if (typeof browser !== 'undefined') {
       browser.storage.local.set(toSave).catch(() => {});
     } else if (typeof chrome !== 'undefined') {
       chrome.storage.local.set(toSave);
     }
 
-    console.log('[Addon] Saved values:', toSave);
-    // Merge with any previously scraped TKGM values so they are not wiped,
-    // then decide whether to auto-trigger a background TKGM lookup.
+    console.log('[Addon] Sahibinden üzerinden çekilen veriler:', toSave);
+    
+    // Eski verilerle (eğer varsa) yeni veriyi birleştiriyoruz. 
+    // Ama önce ilan numarası aynı mı diye bakmamız lazım (farklı ilana geçtiyse eski tapu verisini göstermeyelim).
     try {
       loadStoredData(stored => {
         const merged = { ...toSave };
-        const cacheHit = stored.tkgmCachedUrl && stored.tkgmCachedUrl === toSave.url;
+        const cacheHit = stored.shbndnCachedIlanNo && stored.shbndnCachedIlanNo === toSave.ilanNo;
         
         if (cacheHit) {
+          // İlan numarası aynı! Demek ki önceden çektiğimiz tapu alanı vs. hâlâ geçerli.
           if (stored.tapuAlani) merged.tapuAlani = stored.tapuAlani;
           if (stored.nitelik) merged.nitelik = stored.nitelik;
-          if (stored.tkgmStatus) merged.status = stored.tkgmStatus;
+          
+          if (stored.tapuAlani && stored.nitelik) {
+            merged.status = 'Önbellekten yüklendi (Cache Hit)';
+          } else if (stored.tkgmStatus) {
+            merged.status = stored.tkgmStatus;
+          }
         } else {
-          // New URL -> clear old data so it doesn't mislead the user
+          // Başka bir ilana geçmişiz, eski bilgileri temizle ki kullanıcıyı yanıltmasın
           merged.tapuAlani = '';
           merged.nitelik = '';
-          merged.status = 'New listing detected, checking...';
+          merged.status = 'Yeni ilan algılandı, TKGM sorgulanıyor...';
         }
         
+        // Ekrana basıyoruz
         renderInfoBox(merged);
 
-        // --- Auto-trigger TKGM background API lookup ---
-        // Skip if: already running, or we have both values for this URL
+        // --- Arka planda TKGM API sorgusunu tetikleme kısmı ---
+        // Eğer zaten şu an sorgu çalışıyorsa veya bu ilan için tüm verileri çoktan çektiysek tekrar istek atma (limiti yeme)
         const alreadyRunning = !!window.__tkgmAutoRunning;
         const fullCacheHit = cacheHit && stored.tapuAlani && stored.nitelik;
+        
         if (!alreadyRunning && !fullCacheHit) {
           window.__tkgmAutoRunning = true;
-          renderInfoBox({ ...merged, status: 'TKGM lookup running...' });
+          renderInfoBox({ ...merged, status: 'TKGM verileri çekiliyor...' });
+          
+          // Arka plana (background.js) mesaj atıp "hadi bu ilanı sorgula" diyoruz
           const trigger = () => {
             try {
               if (typeof browser !== 'undefined') {
@@ -821,9 +887,10 @@
     return true;
   }
 
+  // Eklentinin genel hafızasından verileri okuyan yardımcı fonksiyon
   function loadStoredData(callback) {
     try {
-      const keys = ['city', 'district', 'street', 'adaNo', 'parselNo', 'tkgmStatus', 'tapuAlani', 'nitelik', 'tkgmCachedUrl'];
+      const keys = ['city', 'district', 'street', 'adaNo', 'parselNo', 'tkgmStatus', 'tapuAlani', 'nitelik', 'shbndnCachedIlanNo', 'ilanNo'];
       if (typeof browser !== 'undefined') {
         browser.storage.local.get(keys).then(data => callback(data)).catch(() => callback({}));
       } else if (typeof chrome !== 'undefined') {
@@ -834,14 +901,18 @@
     }
   }
 
+  // TKGM sorgusu bitince sonuçları hafızaya yazan fonksiyon
   function saveTkgmStatus(values) {
     const save = { tkgmStatus: values.status || '' };
     if (values.tapuAlani) save.tapuAlani = values.tapuAlani;
     if (values.nitelik) save.nitelik = values.nitelik;
-    // Cache the listing URL so sahibinden page can detect a hit on next load
-    if ((values.tapuAlani || values.nitelik) && values.url) {
-      save.tkgmCachedUrl = values.url;
+    
+    // Limiti boşa harcamamak için İlan Numarasını da kaydediyoruz ki sonraki girişlerde direkt buradan okuyalım
+    // Not: Bu bilgi sahibinden.com üzerinden geliyor, TKGM'den değil.
+    if ((values.tapuAlani || values.nitelik) && values.ilanNo) {
+      save.shbndnCachedIlanNo = values.ilanNo;
     }
+    
     if (typeof browser !== 'undefined') {
       browser.storage.local.set(save).catch(() => {});
       try { browser.runtime.sendMessage({ type: 'tkgmStatusChanged', payload: save }).catch(() => {}); } catch (e) {}
@@ -875,15 +946,16 @@
         // Another tab reports TKGM update; refresh stored data and UI
         loadStoredData(values => {
           if (values && Object.keys(values).length) {
-            if (values.tkgmCachedUrl && values.tkgmCachedUrl !== location.href) return;
-            values.url = location.href;
+            const currentIlanNo = getText('#classifiedId');
+            if (values.shbndnCachedIlanNo && currentIlanNo && values.shbndnCachedIlanNo !== currentIlanNo) return;
+            values.ilanNo = currentIlanNo;
             values.scrapedAt = new Date().toLocaleString();
             renderInfoBox(values);
           }
         });
       }
     });
-  } else if (typeof chrome !== 'undefined' && chrome.runtime) {
+  } else if (typeof chrome !== 'undefined') {
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (msg && msg.type === 'fillTkgm') {
         onFillTkgmMessage();
@@ -892,8 +964,9 @@
       if (msg && msg.type === 'tkgmUpdated') {
         loadStoredData(values => {
           if (values && Object.keys(values).length) {
-            if (values.tkgmCachedUrl && values.tkgmCachedUrl !== location.href) return;
-            values.url = location.href;
+            const currentIlanNo = getText('#classifiedId');
+            if (values.shbndnCachedIlanNo && currentIlanNo && values.shbndnCachedIlanNo !== currentIlanNo) return;
+            values.ilanNo = currentIlanNo;
             values.scrapedAt = new Date().toLocaleString();
             renderInfoBox(values);
           }
@@ -921,34 +994,42 @@
     return;
   }
 
-  // Initial load
+  // Sayfa ilk yüklendiğinde eski verilerle kutucuğu bas
   loadStoredData(values => {
     if (values && Object.keys(values).length) {
-      if (values.tkgmCachedUrl && values.tkgmCachedUrl !== location.href) return;
-      values.url = location.href;
+      const currentIlanNo = getText('#classifiedId');
+      // İlan numarası değişmişse eski veriyi ekrana basma (farklı sekmeler çakışmasın)
+      if (values.shbndnCachedIlanNo && currentIlanNo && values.shbndnCachedIlanNo !== currentIlanNo) return;
+      values.ilanNo = currentIlanNo;
+      
+      if (values.tapuAlani && values.nitelik) {
+        values.status = 'Önbellekten yüklendi (Cache Hit)';
+      }
+      
       values.scrapedAt = new Date().toLocaleString();
       renderInfoBox(values);
     }
   });
 
-  // Track URL to handle SPA navigation and retry scraping if DOM is slow
+  // SPA (Single Page Application) yapısı yüzünden sayfa yenilenmeden link değişirse diye URL'i takip ediyoruz
   let lastUrl = location.href;
   let scrapeAttempts = 0;
   
+  // Elementler bazen geç yüklenir, bulana kadar birkaç kez dener
   const attemptScrape = () => {
     if (savePageData()) {
-      scrapeAttempts = 0; // Success
+      scrapeAttempts = 0; // Başarılı
     } else {
       scrapeAttempts++;
       if (scrapeAttempts < 15) {
-        setTimeout(attemptScrape, 500); // Retry a few times if DOM elements are missing
+        setTimeout(attemptScrape, 500); // Bulamadık, yarım saniye sonra tekrar dene
       }
     }
   };
 
   attemptScrape();
 
-  // Watch for SPA URL changes
+  // URL değişirse (kullanıcı başka ilana tıklarsa) tekrar kazımaya başla
   setInterval(() => {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
