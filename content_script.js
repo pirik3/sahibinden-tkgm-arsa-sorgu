@@ -1029,7 +1029,7 @@
 
   attemptScrape();
 
-  // URL değişirse (kullanıcı başka ilana tıklarsa) tekrar kazımaya başla
+  // URL değişirse (kullanıcı başka ilana tıklarsa) tekrar scrape e başla
   setInterval(() => {
     if (location.href !== lastUrl) {
       lastUrl = location.href;
