@@ -1,14 +1,35 @@
 {
   "manifest_version": 2,
-  "name": "Simple Firefox Add-on",
-  "version": "1.0.0",
-  "description": "A minimal Firefox WebExtension scaffold.",
+  "name": "Sahibinden TKGM Sorgu",
+  "version": "1.0.3",
+  "description": "Sahibinden TKGM Add-on",
+  "author": "pirik3",
+  "homepage_url": "https://github.com/pirik3/sahibinden-tkgm-arsa-sorgu",
+  "icons": {
+    "48": "icon.svg",
+    "96": "icon.svg",
+    "128": "icon.svg"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{0d803964-ba08-47e4-95f8-d11948bfa900}",
+      "data_collection_permissions": {
+        "required": [
+          "websiteContent"
+        ],
+        "optional": []
+      }
+    }
+  },
   "browser_action": {
+    "default_icon": "icon.svg",
     "default_popup": "popup.html",
-    "default_title": "Simple Add-on"
+    "default_title": "Sahibinden TKGM"
   },
   "background": {
-    "scripts": ["background.js"],
+    "scripts": [
+      "background.js"
+    ],
     "persistent": false
   },
   "permissions": [
@@ -19,8 +40,14 @@
   ],
   "content_scripts": [
     {
-      "matches": ["*://*.sahibinden.com/*", "*://sahibinden.com/*", "*://parselsorgu.tkgm.gov.tr/*"],
-      "js": ["content_script.js"],
+      "matches": [
+        "*://*.sahibinden.com/*",
+        "*://sahibinden.com/*",
+        "*://parselsorgu.tkgm.gov.tr/*"
+      ],
+      "js": [
+        "content_script.js"
+      ],
       "run_at": "document_idle"
     }
   ]

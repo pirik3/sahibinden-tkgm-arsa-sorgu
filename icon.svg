@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Yellow Background (Sahibinden-like yellow) -->
+  <rect width="128" height="128" rx="28" fill="#FEE12B"/>
+  
+  <!-- Parcel Map lines -->
+  <g stroke="#333333" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Border of the map area -->
+    <rect x="24" y="24" width="80" height="80" rx="8" fill="#FFF8B0" />
+    
+    <!-- Highlight one parcel (Arsa/Tarla) in Green -->
+    <!-- It goes from x=64, y=24, width=40, height=50 -->
+    <!-- The border radius needs to match the top right corner -->
+    <path d="M 64 24 L 96 24 C 100.4 24 104 27.6 104 32 L 104 74 L 64 74 Z" fill="#4CAF50" />
+    
+    <!-- Internal parcel divisions -->
+    <line x1="24" y1="64" x2="64" y2="64" />
+    <line x1="64" y1="24" x2="64" y2="104" />
+    <line x1="64" y1="74" x2="104" y2="74" />
+    <line x1="44" y1="64" x2="44" y2="104" />
+  </g>
+
+  <!-- Red Map Pin over the green parcel -->
+  <path d="M84 32 C78.477 32 74 36.477 74 42 C74 49.5 84 60 84 60 C84 60 94 49.5 94 42 C94 36.477 89.523 32 84 32 Z" fill="#E53935" />
+  <circle cx="84" cy="42" r="4" fill="#FFFFFF" />
+</svg>

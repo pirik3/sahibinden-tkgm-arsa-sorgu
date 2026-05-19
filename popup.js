@@ -1,6 +1,10 @@
+// Popup açıldığında Chrome/Firefox hafızasındaki (storage) son verileri okuyup ekrana basar.
 async function showStoredCity() {
   try {
+    // Hafızadaki tüm ihtiyacımız olan alanları topluca çekiyoruz
     const data = await browser.storage.local.get(['city', 'district', 'street', 'adaNo', 'parselNo', 'tapuAlani', 'nitelik', 'tkgmStatus', 'tkgmRequestCount', 'tkgmRequestDate']);
+    
+    // Değerleri ilgili HTML elementlerine yazıyoruz, boşsa 'Not set' diyelim şimdilik
     document.getElementById('city').textContent = data.city || 'Not set';
     document.getElementById('district').textContent = data.district || 'Not set';
     const streetEl = document.getElementById('street');
@@ -16,6 +20,7 @@ async function showStoredCity() {
     const statusEl = document.getElementById('tkgm-status');
     if (statusEl) statusEl.textContent = data.tkgmStatus || 'Not started';
 
+    // Günlük limit sayacını hesaplayıp ekrana yazıyoruz (tarih bugüne eşit değilse sıfırlanmış say)
     const dailyCountEl = document.getElementById('daily-count');
     if (dailyCountEl) {
       const today = new Date().toDateString();
@@ -23,6 +28,7 @@ async function showStoredCity() {
       dailyCountEl.textContent = `${count}/70`;
     }
   } catch (e) {
+    // Bir şeyler ters giderse ekranda hata yazsın ki anlayalım
     document.getElementById('city').textContent = 'Error';
     document.getElementById('district').textContent = 'Error';
     const streetEl = document.getElementById('street');
@@ -42,37 +48,15 @@ async function showStoredCity() {
   }
 }
 
-document.getElementById('get-url').addEventListener('click', async () => {
-  try {
-    const tabs = await browser.tabs.query({active: true, currentWindow: true});
-    const url = tabs[0]?.url || 'No active tab';
-    document.getElementById('url').textContent = url;
-  } catch (err) {
-    document.getElementById('url').textContent = 'Error: ' + err.message;
-  }
-});
-
-document.getElementById('open-tkgm').addEventListener('click', async () => {
-  const statusEl = document.getElementById('tkgm-status');
-  statusEl.textContent = 'Opening TKGM...';
-  try {
-    const data = await browser.storage.local.get(['city', 'district', 'street', 'adaNo', 'parselNo']);
-    if (!data.city || !data.district || !data.street || !data.adaNo || !data.parselNo) {
-      statusEl.textContent = 'Missing listing data';
-      return;
-    }
-    const response = await browser.runtime.sendMessage({type: 'openTkgm', values: data});
-    statusEl.textContent = response && response.success ? 'TKGM opened' : 'Failed to open TKGM';
-  } catch (err) {
-    statusEl.textContent = 'Error: ' + err.message;
-  }
-});
-
+// Popup'ın HTML içeriği yüklendiğinde çalışacak kısım
 document.addEventListener('DOMContentLoaded', () => {
-  showStoredCity();
+  showStoredCity(); // Önce bir verileri çekip gösterelim
+  
+  // Eğer biz popup'a bakarken arka planda bir sorgu biterse, anında ekranda da güncellensin diye dinleyici koyduk
   if (browser.storage && browser.storage.onChanged) {
     browser.storage.onChanged.addListener((changes, area) => {
       if (area !== 'local') return;
+      
       if (changes.tkgmStatus) {
         const statusEl = document.getElementById('tkgm-status');
         if (statusEl) statusEl.textContent = changes.tkgmStatus.newValue || 'Not started';
@@ -86,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el) el.textContent = changes.nitelik.newValue || 'Not set';
       }
       if (changes.tkgmRequestCount || changes.tkgmRequestDate) {
-        showStoredCity(); // reload full state easily to check date + count logic
+        showStoredCity(); // Sayaç güncellenirse tüm formu bir daha tazelemek en temizi
       }
     });
   }
