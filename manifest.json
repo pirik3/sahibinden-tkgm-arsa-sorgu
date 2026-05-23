@@ -41,8 +41,7 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*.sahibinden.com/*",
-        "*://sahibinden.com/*",
+        "*://*.sahibinden.com/satilik-arsa/*",
         "*://parselsorgu.tkgm.gov.tr/*"
       ],
       "js": [
