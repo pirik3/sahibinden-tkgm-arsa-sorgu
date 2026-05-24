@@ -1,4 +1,6 @@
-# Simple Firefox Add-on
+# Sahibinden TKGM üzerinden arsa sorgu
+
+Firefox için https://addons.mozilla.org/en-US/firefox/addon/sahibinden-tkgm-sorgu/
 
 This is a minimal WebExtension scaffold for Firefox (Manifest V3).
 
