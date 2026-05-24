@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Sahibinden TKGM Sorgu",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Sahibinden TKGM Add-on",
   "author": "pirik3",
   "homepage_url": "https://github.com/pirik3/sahibinden-tkgm-arsa-sorgu",
